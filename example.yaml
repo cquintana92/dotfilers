@@ -1,0 +1,77 @@
+.dotfilers:
+  # Log level for the dotfilers binary
+  # Must be one of:
+  # - trace
+  # - debug
+  # - info
+  # - warn
+  # - error
+  log_level: debug
+
+  # Strategy to use in case of conflict (the file that would be created already exists)
+  # Must be one of:
+  # - abort (the program will stop)
+  # - overwrite (the already existing file/directory will be removed)
+  # - rename-old (the already existing file/directory will be renamed to NAME.bak, and in case it also exists, .bak1, .bak2...)
+  conflict_strategy: rename-old
+
+  # Shell that will be used for 'run' directives
+  shell: /bin/bash -c
+
+# Section for zsh files
+zsh:
+  # Create a symlink from zsh/.zshrc to ~/.zshrc
+  - link_from: zsh/.zshrc
+    link_to: ~/.zshrc
+
+  # Only if the os is linux, create a symlink from zsh/.zshrc.linux to ~/.zshrc.local
+  - if_os: linux
+    link_from: zsh/.zshrc.linux
+    link_to: ~/.zshrc.local
+
+  # Only if the os is darwin, create a symlink from zsh/.zshrc.linux to ~/.zshrc.local
+  - if_os: darwin
+    link_from: zsh/.zshrc.darwin
+    link_to: ~/.zshrc.local
+
+# Section for ssh files
+ssh:
+  # Only if the os is linux:
+  # - use the template on ssh/config.tpl
+  # - fill it using the vars from ssh/vars_linux
+  # - store the result at ~/.ssh/config
+  - if_os: linux
+    template: ssh/config.tpl
+    template_to: ~/.ssh/config
+    vars: ssh/vars_linux
+
+  # Only if the os is darwin:
+  # - use the template on ssh/config.tpl
+  # - fill it using the vars from ssh/vars_linux
+  # - store the result at ~/.ssh/config
+  - if_os: darwin
+    template: ssh/config.tpl
+    template_to: ~/.ssh/config
+    vars: ssh/vars_darwin
+
+  # Copy all files that match id_rsa* from the ssh folder into ~/.ssh/
+  - copy_from: ssh/id_rsa*
+    copy_to: ~/.ssh/
+
+# Section for nvim files
+nvim:
+  # As this section is too long, run the contents of nvim/deploy.yaml
+  - include: nvim/deploy.yaml
+
+# Section for extra things
+extra:
+  # Run inline code
+  - run: echo "abc" > /tmp/abc
+
+  # Run multiple commands
+  - run: |
+      echo "some_contents" >> /tmp/abc
+      echo "Other contents" >> /tmp/abc
+
+  # You can even invoke other programs/scripts
+  - run: /usr/bin/python3 -c "print('a' * 127)" > /tmp/lotsofas

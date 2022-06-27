@@ -1,0 +1,33 @@
+[package]
+name = "dotfilers"
+version = "0.0.1"
+edition = "2021"
+authors = ["Carlos Quintana <carlos@cquintana.dev>"]
+publish = false
+autotests = false
+
+[lib]
+doctest = false
+
+[dependencies]
+anyhow = "1.0"
+chrono = "0.4"
+clap = "2.34"
+fs_extra = "1.2"
+git-version = "0.3"
+glob = "0.3"
+serde = { version = "1.0", features = ["derive"] }
+serde_yaml = "0.8"
+shellexpand = "2.1.0"
+symlink = "0.1"
+tera = "1.16"
+thiserror = "1.0"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[dev-dependencies]
+rand = "0.8"
+
+[[test]]
+name = "integration"
+path = "tests/lib.rs"

@@ -1,0 +1,49 @@
+name: code_quality
+on:
+  pull_request: {}
+  push:
+    branches:
+      - main
+jobs:
+  lint:
+    name: lint
+    runs-on: ubuntu-20.04
+    steps:
+      # Setup repo (depth: 0 is for retrieving all info, so git-version does not crash)
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      # Install rust stable
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+
+      # Setup Rust cache
+      - uses: Swatinem/rust-cache@v1
+
+      # Check format
+      - run: cargo fmt --all -- --check
+
+      # Clippy (linter)
+      - run: cargo clippy --all --all-targets -- -D warnings
+
+  test:
+    name: test
+    runs-on: ubuntu-20.04
+    steps:
+      # Setup repo (depth: 0 is for retrieving all info, so git-version does not crash)
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      # Install rust stable
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+
+      # Setup Rust cache
+      - uses: Swatinem/rust-cache@v1
+
+      # Run rust tests
+      - run: cargo test --all
