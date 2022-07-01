@@ -1,8 +1,11 @@
 [package]
 name = "dotfilers"
-version = "0.0.1"
+version = "0.0.2"
 edition = "2021"
 authors = ["Carlos Quintana <carlos@cquintana.dev>"]
+description = "Dotfile management utility written in Rust"
+readme = "README.md"
+license = "MIT"
 autotests = false
 
 [lib]
