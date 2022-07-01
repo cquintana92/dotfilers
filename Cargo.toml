@@ -3,7 +3,6 @@ name = "dotfilers"
 version = "0.0.1"
 edition = "2021"
 authors = ["Carlos Quintana <carlos@cquintana.dev>"]
-publish = false
 autotests = false
 
 [lib]
