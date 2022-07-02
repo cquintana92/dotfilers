@@ -63,6 +63,15 @@ nvim:
   # As this section is too long, run the contents of nvim/deploy.yaml
   - include: nvim/deploy.yaml
 
+# Section for mash files
+mash:
+  # This will recursively link all files inside the mash directory into ~/mash
+  # However, any existing directories will be created rather than symlinked
+  - link_from: mash
+    link_to: ~/mash
+    link_directory_behaviour: create
+
+
 # Section for extra things
 extra:
   # Run inline code

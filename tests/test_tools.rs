@@ -19,3 +19,12 @@ pub fn write_file<P: AsRef<Path>>(dir: P, file_name: &str, contents: &str) {
     let file_path = dir.as_ref().join(file_name);
     std::fs::write(file_path, contents).expect("Error writing test file");
 }
+
+pub fn dir_contents<P: AsRef<Path>>(dir: P) -> Vec<PathBuf> {
+    let mut contents = vec![];
+    let entries = std::fs::read_dir(&dir).unwrap();
+    for entry in entries {
+        contents.push(entry.unwrap().path());
+    }
+    contents
+}

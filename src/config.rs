@@ -121,10 +121,45 @@ pub struct DirectiveStep {
 }
 
 #[derive(Debug, Eq, PartialEq)]
+pub enum LinkDirectoryBehaviour {
+    LinkDirectory,
+    CreateDirectory,
+}
+
+impl Default for LinkDirectoryBehaviour {
+    fn default() -> Self {
+        LinkDirectoryBehaviour::LinkDirectory
+    }
+}
+
+impl FromStr for LinkDirectoryBehaviour {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self> {
+        match s.to_lowercase().as_str() {
+            "link" => Ok(Self::LinkDirectory),
+            "create" => Ok(Self::CreateDirectory),
+            _ => Err(Error::Config(format!("unknown LinkDirectoryBehaviour: {s}"))),
+        }
+    }
+}
+
+impl ToString for LinkDirectoryBehaviour {
+    fn to_string(&self) -> String {
+        match self {
+            LinkDirectoryBehaviour::CreateDirectory => "create",
+            LinkDirectoryBehaviour::LinkDirectory => "link",
+        }
+        .to_string()
+    }
+}
+
+#[derive(Debug, Eq, PartialEq)]
 pub enum Directive {
     Link {
         from: String,
         to: String,
+        directory_behaviour: LinkDirectoryBehaviour,
     },
     Copy {
         from: String,
@@ -149,6 +184,7 @@ struct YamlDirectiveStep {
     if_os: Option<String>,
     link_from: Option<String>,
     link_to: Option<String>,
+    link_directory_behaviour: Option<String>,
     run: Option<String>,
     include: Option<String>,
     copy_from: Option<String>,
@@ -206,9 +242,15 @@ impl StateConfig {
     fn extract_directive(d: &YamlDirectiveStep) -> Result<Directive> {
         match (&d.link_from, &d.link_to) {
             (Some(from), Some(to)) => {
+                let behaviour = match d.link_directory_behaviour {
+                    Some(ref b) => LinkDirectoryBehaviour::from_str(b)
+                        .map_err(|e| Error::Config(format!("Error reading LinkDirectoryBehaviour: {}", e)))?,
+                    None => LinkDirectoryBehaviour::LinkDirectory,
+                };
                 return Ok(Directive::Link {
                     from: from.to_string(),
                     to: to.to_string(),
+                    directory_behaviour: behaviour,
                 });
             }
             (None, None) => {}
@@ -352,7 +394,8 @@ nvim:
             nvim[0].directive,
             Directive::Link {
                 from: "./file_a".to_string(),
-                to: "~/file_b".to_string()
+                to: "~/file_b".to_string(),
+                directory_behaviour: LinkDirectoryBehaviour::default(),
             }
         );
     }
@@ -396,7 +439,8 @@ ssh:
             nvim[0].directive,
             Directive::Link {
                 from: "./file_a".to_string(),
-                to: "~/file_b".to_string()
+                to: "~/file_b".to_string(),
+                directory_behaviour: LinkDirectoryBehaviour::default(),
             }
         );
         assert_eq!(nvim[1].condition, Condition::IfOs(Os::Darwin));
@@ -422,7 +466,8 @@ ssh:
             ssh[2].directive,
             Directive::Link {
                 from: "ssh/config".to_string(),
-                to: "~/.ssh/config".to_string()
+                to: "~/.ssh/config".to_string(),
+                directory_behaviour: LinkDirectoryBehaviour::default(),
             }
         );
         assert_eq!(ssh[3].condition, Condition::IfOs(Os::Linux));
