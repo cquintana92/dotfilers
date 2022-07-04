@@ -106,7 +106,15 @@ ssh:
 nvim:
   # As this section is too long, run the contents of nvim/deploy.yaml
   - include: nvim/deploy.yaml
-    
+
+# Section for mash files
+mash:
+  # This will recursively link all files inside the mash directory into ~/mash
+  # However, any existing directories will be created rather than symlinked 
+  - link_from: mash
+    link_to: ~/mash
+    link_directory_behaviour: create
+
 # Section for extra things
 extra:
   # Run inline code
@@ -150,6 +158,9 @@ Sections:
 * `link_to`: Where to symlink the files.
     * If the `link_from` is a single file, please also write the desired destination filename (such as: `link_to: ~/.ssh/authorized_keys`).
     * If the `link_from` is a glob, you should use the path to the destination directory (such as: `link_from: directory/*.txt` and `link_to: ~/data`).
+* `link_directory_behaviour`: What to do with directories. If not specified defaults to `link`.
+  * If set to `create`, all the directories inside the dir will be created as directories rather than symlinked to the directory. Then, the files inside the original directory will be recursively symlinked.
+  * If set to `link`, any directories found will just be symlinked.
 
 #### Template
 

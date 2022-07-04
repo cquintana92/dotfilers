@@ -1,5 +1,5 @@
 use crate::test_tools::*;
-use dotfilers::{Condition, ConflictStrategy, Directive, DirectiveStep, Executor};
+use dotfilers::{Condition, ConflictStrategy, Directive, DirectiveStep, Executor, LinkDirectoryBehaviour};
 
 #[test]
 fn copy_globs_work() {
@@ -90,6 +90,7 @@ fn symlink_globs_work() {
                     directive: Directive::Link {
                         from: format!("{}/*.txt", &from_dir_name),
                         to: to_dir_name,
+                        directory_behaviour: LinkDirectoryBehaviour::default(),
                     },
                 }],
             )

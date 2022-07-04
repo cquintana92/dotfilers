@@ -1,4 +1,5 @@
 use crate::config::{Condition, ConflictStrategy, Directive, DirectiveStep, Os, StateConfig};
+use crate::LinkDirectoryBehaviour;
 use anyhow::{anyhow, Context, Result};
 use fs_extra::dir::CopyOptions;
 use std::path::{Path, PathBuf};
@@ -52,11 +53,18 @@ where
 {
     pub fn execute<P: AsRef<Path>>(&self, root_dir: P, section: &str, directives: &[DirectiveStep]) -> Result<()> {
         let root_dir = root_dir.as_ref();
-        info!("Using root_dir: {}", root_dir.display());
+        if self.dry_run {
+            info!("Using root_dir: {}", root_dir.display());
+        } else {
+            debug!("Using root_dir: {}", root_dir.display());
+        }
+
         for directive in directives {
             debug!("Executing [section={}] [directive={:?}]", section, directive);
             self.execute_directive(root_dir, directive)?;
         }
+
+        info!("Executed section {}", section);
         Ok(())
     }
 
@@ -75,9 +83,18 @@ where
         }
 
         match &directive.directive {
-            Directive::Link { from, to } => {
-                debug!("Link directive [from={}] [to={}]", from, to);
-                self.execute_symlink(root_dir, from, to)?;
+            Directive::Link {
+                from,
+                to,
+                directory_behaviour,
+            } => {
+                debug!(
+                    "Link directive [from={}] [to={}] [behaviour={}]",
+                    from,
+                    to,
+                    directory_behaviour.to_string()
+                );
+                self.execute_symlink(root_dir, from, to, directory_behaviour)?;
             }
             Directive::Copy { from, to } => {
                 debug!("Copy directive [from={}] [to={}]", from, to);
@@ -100,24 +117,86 @@ where
         Ok(())
     }
 
-    fn execute_symlink(&self, root_dir: &Path, from: &str, to: &str) -> Result<()> {
+    fn execute_symlink(&self, root_dir: &Path, from: &str, to: &str, behaviour: &LinkDirectoryBehaviour) -> Result<()> {
         let paths = self
             .get_paths_to_process(root_dir, from, to)
             .context("Error obtaining paths to process")?;
+        let remove_dirs = behaviour.ne(&LinkDirectoryBehaviour::CreateDirectory);
         for (from, to) in paths {
-            let (from, to) = self
-                .check_for_conflicts(root_dir, &from, &to)
+            let (from_path, to_path) = self
+                .check_for_conflicts(root_dir, &from, &to, remove_dirs)
                 .context("Error in symlink prerequirements")?;
-            if from.is_dir() {
-                if self.dry_run {
-                    info!("Would symlink dir {} -> {}", from.display(), to.display());
-                } else {
-                    symlink::symlink_dir(&from, &to).context(format!("Error symlinking dir {} -> {}", from.display(), to.display()))?;
+            if from_path.is_dir() {
+                match behaviour {
+                    LinkDirectoryBehaviour::LinkDirectory => {
+                        if self.dry_run {
+                            info!("Would symlink dir {} -> {}", from_path.display(), to_path.display());
+                        } else {
+                            symlink::symlink_dir(&from_path, &to_path).context(format!(
+                                "Error symlinking dir {} -> {}",
+                                from_path.display(),
+                                to_path.display()
+                            ))?;
+                            info!("Symlinked dir {} -> {}", from_path.display(), to_path.display());
+                        }
+                    }
+                    LinkDirectoryBehaviour::CreateDirectory => {
+                        if !to_path.exists() {
+                            if self.dry_run {
+                                info!(
+                                    "Would create dir {} as LinkDirectoryBehaviour is set to CreateDirectory",
+                                    to_path.display()
+                                );
+                            } else {
+                                debug!(
+                                    "Creating dir {} as LinkDirectoryBehaviour is set to CreateDirectory",
+                                    to_path.display()
+                                );
+                                std::fs::create_dir(&to_path).context(format!("Error creating directory {}", to_path.display()))?;
+                                info!("Created dir {}", to_path.display());
+                            }
+                        } else if self.dry_run {
+                            info!("To path already exists, no need to do anything {}", to_path.display());
+                        } else {
+                            debug!("To path already exists, no need to do anything {}", to_path.display());
+                        }
+
+                        // Now recurse in files inside from
+                        let from_files =
+                            std::fs::read_dir(&from_path).context(format!("Error getting dir contents of {}", from_path.display()))?;
+                        for entry in from_files {
+                            let entry = entry.context(format!("Error getting entry of dir {}", from_path.display()))?;
+                            let entry = entry.path();
+                            let entry_without_prefix = entry
+                                .strip_prefix(&root_dir)
+                                .context(format!(
+                                    "Error stripping prefix from entry [entry={}] [prefix={}]",
+                                    entry.display(),
+                                    root_dir.display()
+                                ))?
+                                .to_path_buf();
+                            let from_path = entry_without_prefix.display().to_string();
+                            let from_filename = match entry.file_name() {
+                                Some(f) => match f.to_str() {
+                                    Some(filename) => filename.to_string(),
+                                    None => return Err(anyhow!("Cannot convert to str {:?}", f)),
+                                },
+                                None => return Err(anyhow!("Cannot obtain filename from {}", entry.display())),
+                            };
+                            let to_path = format!("{}/{}", to, from_filename);
+                            self.execute_symlink(root_dir, &from_path, &to_path, behaviour)?;
+                        }
+                    }
                 }
             } else if self.dry_run {
-                info!("Would symlink file {} -> {}", from.display(), to.display());
+                info!("Would symlink file {} -> {}", from_path.display(), to_path.display());
             } else {
-                symlink::symlink_file(&from, &to).context(format!("Error symlinking file {} -> {}", from.display(), to.display()))?;
+                symlink::symlink_file(&from_path, &to_path).context(format!(
+                    "Error symlinking file {} -> {}",
+                    from_path.display(),
+                    to_path.display()
+                ))?;
+                info!("Symlinked file {} -> {}", from_path.display(), to_path.display());
             }
         }
 
@@ -130,7 +209,7 @@ where
             .context("Error obtaining paths to process")?;
         for (from, to) in paths {
             let (from, to) = self
-                .check_for_conflicts(root_dir, &from, &to)
+                .check_for_conflicts(root_dir, &from, &to, true)
                 .context("Error in copy prerequirements")?;
             if from.is_dir() {
                 if self.dry_run {
@@ -145,12 +224,14 @@ where
                         },
                     )
                     .context(format!("Error copying dir {} -> {}", from.display(), to.display()))?;
+                    info!("Copied dir {} -> {}", from.display(), to.display());
                 }
             } else if self.dry_run {
                 info!("Would copy file {} -> {}", from.display(), to.display());
             } else {
                 debug!("Copying {} -> {}", from.display(), to.display());
                 std::fs::copy(&from, &to).context(format!("Error copying file {} -> {}", from.display(), to.display()))?;
+                info!("Copied file {} -> {}", from.display(), to.display());
             }
         }
 
@@ -204,7 +285,7 @@ where
         Ok(paths)
     }
 
-    fn check_for_conflicts(&self, root_dir: &Path, from: &str, to: &str) -> Result<(PathBuf, PathBuf)> {
+    fn check_for_conflicts(&self, root_dir: &Path, from: &str, to: &str, delete_if_dir: bool) -> Result<(PathBuf, PathBuf)> {
         // Check if from file exists
         let from_path = root_dir.join(from);
         let to_path = root_dir.join(to);
@@ -264,8 +345,6 @@ where
                     return Ok((from_path, to_path));
                 }
                 ConflictStrategy::Overwrite => {
-                    warn!("ConflictStrategy set to overwrite. Overwriting");
-
                     if to_path.is_symlink() {
                         if to_path.is_file() {
                             if self.dry_run {
@@ -276,12 +355,21 @@ where
                                     .context(format!("Error removing file symlink {}", to_path.display()))?;
                             }
                         } else if to_path.is_dir() {
-                            if self.dry_run {
-                                info!("Would remove dir symlink {}", to_path.display());
+                            if delete_if_dir {
+                                if self.dry_run {
+                                    info!("Would remove dir symlink {}", to_path.display());
+                                } else {
+                                    warn!("Removing dir symlink {}", to_path.display());
+                                    symlink::remove_symlink_dir(&to_path)
+                                        .context(format!("Error removing dir symlink {}", to_path.display()))?;
+                                }
+                            } else if self.dry_run {
+                                info!(
+                                    "Would not remove dir symlink as is specified in configuration {}",
+                                    to_path.display()
+                                );
                             } else {
-                                warn!("Removing dir symlink {}", to_path.display());
-                                symlink::remove_symlink_dir(&to_path)
-                                    .context(format!("Error removing dir symlink {}", to_path.display()))?;
+                                debug!("Not removing dir symlink as is specified in configuration {}", to_path.display());
                             }
                         }
                     } else if to_path.is_file() {
@@ -290,6 +378,19 @@ where
                         } else {
                             warn!("Removing file {}", to_path.display());
                             std::fs::remove_file(&to_path).context(format!("Error removing file {}", to_path.display()))?;
+                        }
+                    } else if to_path.is_dir() {
+                        if delete_if_dir {
+                            if self.dry_run {
+                                info!("Would remove dir {}", to_path.display());
+                            } else {
+                                warn!("Removing dir {}", to_path.display());
+                                std::fs::remove_dir_all(&to_path).context(format!("Error removing dir {}", to_path.display()))?;
+                            }
+                        } else if self.dry_run {
+                            info!("Would not remove dir as is specified in configuration {}", to_path.display());
+                        } else {
+                            debug!("Not removing dir as is specified in configuration {}", to_path.display());
                         }
                     } else if self.dry_run {
                         info!("Would remove dir {}", to_path.display());
@@ -351,6 +452,8 @@ where
                     ));
                 }
             }
+
+            info!("Executed command {}", cmd);
         }
 
         Ok(())
@@ -376,12 +479,14 @@ where
                 .context(format!("Error executing directives from file {}", yaml_path.display()))?;
         }
 
+        info!("Finished include section {}", path);
+
         Ok(())
     }
 
     fn template(&self, root_dir: &Path, template: &str, dest: &str, vars: &Option<String>) -> Result<()> {
         let (template, dest) = self
-            .check_for_conflicts(root_dir, template, dest)
+            .check_for_conflicts(root_dir, template, dest, true)
             .context("Error preparing files for templating")?;
 
         let template_contents =
@@ -400,6 +505,7 @@ where
         } else {
             debug!("Writing template into {}", dest.display());
             std::fs::write(&dest, rendered).context(format!("Error writing templated contents into {}", dest.display()))?;
+            info!("Rendered file {}", dest.display());
         }
 
         Ok(())
