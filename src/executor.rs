@@ -128,6 +128,19 @@ where
                 .context("Error in symlink prerequirements")?;
             if from_path.is_dir() {
                 match behaviour {
+                    LinkDirectoryBehaviour::IgnoreDirectories => {
+                        if self.dry_run {
+                            info!(
+                                "Skipping dir {} as LinkDirectoryBehaviour is set to IgnoreDirectories",
+                                from_path.display()
+                            );
+                        } else {
+                            debug!(
+                                "Skipping dir {} as LinkDirectoryBehaviour is set to IgnoreDirectories",
+                                from_path.display()
+                            );
+                        }
+                    }
                     LinkDirectoryBehaviour::LinkDirectory => {
                         if self.dry_run {
                             info!("Would symlink dir {} -> {}", from_path.display(), to_path.display());
@@ -288,7 +301,11 @@ where
     fn check_for_conflicts(&self, root_dir: &Path, from: &str, to: &str, delete_if_dir: bool) -> Result<(PathBuf, PathBuf)> {
         // Check if from file exists
         let from_path = root_dir.join(from);
-        let to_path = root_dir.join(to);
+        let to_path = if to.contains('~') {
+            PathBuf::from(shellexpand::tilde(to).to_string())
+        } else {
+            root_dir.join(to)
+        };
         debug!("Checking if 'from' exists: {}", from_path.display());
 
         if !from_path.exists() {

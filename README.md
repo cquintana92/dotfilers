@@ -114,6 +114,13 @@ mash:
   - link_from: mash
     link_to: ~/mash
     link_directory_behaviour: create
+    
+other:
+  # This will symlink all files found inside the 'other' directory,
+  # but will ignore any directory found inside the 'other' directory
+  - link_from: other/*
+    link_to: ~/.config/other
+    link_directory_behaviour: ignore
 
 # Section for extra things
 extra:
@@ -161,6 +168,7 @@ Sections:
 * `link_directory_behaviour`: What to do with directories. If not specified defaults to `link`.
   * If set to `create`, all the directories inside the dir will be created as directories rather than symlinked to the directory. Then, the files inside the original directory will be recursively symlinked.
   * If set to `link`, any directories found will just be symlinked.
+  * If set to `ignore` any directories that match the `link_from` (specially if it's a glob) will be ignored.
 
 #### Template
 

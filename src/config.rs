@@ -124,6 +124,7 @@ pub struct DirectiveStep {
 pub enum LinkDirectoryBehaviour {
     LinkDirectory,
     CreateDirectory,
+    IgnoreDirectories,
 }
 
 impl Default for LinkDirectoryBehaviour {
@@ -139,6 +140,7 @@ impl FromStr for LinkDirectoryBehaviour {
         match s.to_lowercase().as_str() {
             "link" => Ok(Self::LinkDirectory),
             "create" => Ok(Self::CreateDirectory),
+            "ignore" => Ok(Self::IgnoreDirectories),
             _ => Err(Error::Config(format!("unknown LinkDirectoryBehaviour: {s}"))),
         }
     }
@@ -149,6 +151,7 @@ impl ToString for LinkDirectoryBehaviour {
         match self {
             LinkDirectoryBehaviour::CreateDirectory => "create",
             LinkDirectoryBehaviour::LinkDirectory => "link",
+            LinkDirectoryBehaviour::IgnoreDirectories => "ignore",
         }
         .to_string()
     }

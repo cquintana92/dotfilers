@@ -2,6 +2,51 @@ use crate::test_tools::*;
 use dotfilers::{Condition, ConflictStrategy, Directive, DirectiveStep, Executor, LinkDirectoryBehaviour};
 
 #[test]
+fn behaviour_ignore_dir() {
+    run_with_temp_dir(|pb| {
+        let original_dir = pb.join("original");
+        let dir = original_dir.join("adir");
+        let dest_dir = pb.join("dest");
+
+        std::fs::create_dir(&original_dir).unwrap();
+        std::fs::create_dir(dir).unwrap();
+
+        let file_contents = random_string(10);
+        write_file(&original_dir, "afile", &file_contents);
+
+        let executor = Executor::new("", ConflictStrategy::Overwrite);
+        executor
+            .execute(
+                &pb,
+                "test",
+                &[DirectiveStep {
+                    condition: Condition::Always,
+                    directive: Directive::Link {
+                        from: original_dir.join("*").display().to_string(), // Use original_dir/* for globing
+                        to: dest_dir.display().to_string(),
+                        directory_behaviour: LinkDirectoryBehaviour::IgnoreDirectories,
+                    },
+                }],
+            )
+            .expect("Should be able to execute");
+
+        assert!(dest_dir.exists());
+        assert!(!dest_dir.is_symlink());
+        assert!(dest_dir.is_dir());
+
+        let dir_contents = dir_contents(&dest_dir);
+        assert_eq!(dir_contents.len(), 1);
+
+        let dest_file = &dir_contents[0];
+        assert!(dest_file.exists());
+        assert!(dest_file.is_file());
+        assert!(dest_file.is_symlink());
+
+        Ok(())
+    });
+}
+
+#[test]
 fn behaviour_link_dir_dest_did_not_exist() {
     run_with_temp_dir(|pb| {
         let original_dir = pb.join("original");
