@@ -128,6 +128,19 @@ where
                 .context("Error in symlink prerequirements")?;
             if from_path.is_dir() {
                 match behaviour {
+                    LinkDirectoryBehaviour::IgnoreDirectories => {
+                        if self.dry_run {
+                            info!(
+                                "Skipping dir {} as LinkDirectoryBehaviour is set to IgnoreDirectories",
+                                from_path.display()
+                            );
+                        } else {
+                            debug!(
+                                "Skipping dir {} as LinkDirectoryBehaviour is set to IgnoreDirectories",
+                                from_path.display()
+                            );
+                        }
+                    }
                     LinkDirectoryBehaviour::LinkDirectory => {
                         if self.dry_run {
                             info!("Would symlink dir {} -> {}", from_path.display(), to_path.display());
