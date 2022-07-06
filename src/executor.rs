@@ -314,7 +314,20 @@ where
 
         // Check if to already exists
         debug!("Checking if 'to' exists: {}", to_path.display());
-        if to_path.exists() {
+        let mut to_already_exists = to_path.exists();
+        if !to_already_exists {
+            debug!(
+                "Detected 'to' does not exist. Checking if is a broken symlink {}",
+                to_path.display()
+            );
+            // Check for broken symlink
+            if std::fs::symlink_metadata(&to_path).is_ok() {
+                debug!("Detected 'to' is a broken symlink {}", to_path.display());
+                to_already_exists = true;
+            }
+        }
+
+        if to_already_exists {
             debug!("'to' exists: {}", to_path.display());
 
             // To already exists. Check conflict strategy
@@ -388,6 +401,14 @@ where
                             } else {
                                 debug!("Not removing dir symlink as is specified in configuration {}", to_path.display());
                             }
+                        } else {
+                            // Probably a broken symlink if is neither a file nor a dir
+                            if self.dry_run {
+                                info!("Would remove broken symlink {}", to_path.display());
+                            } else {
+                                warn!("Removing broken symlink {}", to_path.display());
+                                symlink::remove_symlink_file(&to_path).context("Error removing broken symlink")?;
+                            }
                         }
                     } else if to_path.is_file() {
                         if self.dry_run {
@@ -418,6 +439,7 @@ where
                 }
             }
         } else {
+            debug!("To {} does not exist", to_path.display());
             // Check if parent dir structure exists
             if let Some(parent) = to_path.parent() {
                 if !parent.exists() {
