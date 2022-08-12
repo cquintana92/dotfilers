@@ -10,7 +10,10 @@ const DRY_RUN_ARG: &str = "dry-run";
 const SECTIONS_ARG: &str = "sections";
 const DEFAULT_FILE_NAME: &str = "dotfilers.yaml";
 
-const VERSION: &str = git_version::git_version!(args = ["--tags", "--always", "--abbrev=1", "--dirty=-modified"]);
+const VERSION: &str = git_version::git_version!(
+    args = ["--tags", "--always", "--abbrev=1", "--dirty=-modified"],
+    fallback = clap::crate_version!()
+);
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Default)]
 pub struct IsoTime;
