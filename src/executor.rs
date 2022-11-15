@@ -181,7 +181,7 @@ where
                             let entry = entry.context(format!("Error getting entry of dir {}", from_path.display()))?;
                             let entry = entry.path();
                             let entry_without_prefix = entry
-                                .strip_prefix(&root_dir)
+                                .strip_prefix(root_dir)
                                 .context(format!(
                                     "Error stripping prefix from entry [entry={}] [prefix={}]",
                                     entry.display(),
@@ -280,7 +280,7 @@ where
             for entry in glob_iter {
                 let entry = entry.context("Error obtaining glob entry")?;
                 let entry_without_prefix = entry
-                    .strip_prefix(&root_dir)
+                    .strip_prefix(root_dir)
                     .context("Error stripping prefix from glob")?
                     .to_path_buf();
                 let from_path = entry_without_prefix.display().to_string();
@@ -447,7 +447,7 @@ where
                         info!("As parent dir does not exist, would have created {}", parent.display());
                     } else {
                         debug!("Creating parent dir structure {}", parent.display());
-                        std::fs::create_dir_all(&parent).context(format!("Error creating parent dir structure {}", parent.display()))?;
+                        std::fs::create_dir_all(parent).context(format!("Error creating parent dir structure {}", parent.display()))?;
                     }
                 }
             }
